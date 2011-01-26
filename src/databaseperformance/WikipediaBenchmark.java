@@ -45,12 +45,19 @@ public class WikipediaBenchmark {
         }
     }
 
+    private int findArticle(String title, int i, Connection conn) {
+        
+        return i;
+    }
+
     public void searchArticle(String text, int limit) {
         this.startTimer();
+        this.limit=limit;
         try {
             if (this.isSQL()) {
                 this.addLog("Öffne MySQL Verbindung");
                 Connection conn = this.openConnection();
+                this.findArticle(text, 0, conn);
                 Statement stmt = (Statement) conn.createStatement();
                 //Artikel suchen
                 this.resetTimer();
