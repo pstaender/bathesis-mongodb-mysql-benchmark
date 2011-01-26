@@ -49,7 +49,7 @@ public class Main {
             
             bench.searchArticle(searchtext,limit);
 
-            System.out.println("fertig :)");
+            System.out.println("fertig");
 
         } catch (Exception e) {
          e.printStackTrace();

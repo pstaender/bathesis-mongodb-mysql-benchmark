@@ -32,10 +32,12 @@ public class WikipediaBenchmark {
     public int port = 3306;
 
     public int limit = 1000;
+    private int articleCount = 0;
 
     private long startTime = 0;
     private long stopTime = 0;
     private ArrayList<Number> timeStack;
+    private ArrayList<String> checkedArticle;
 
     public WikipediaBenchmark() {
         try {
@@ -43,14 +45,69 @@ public class WikipediaBenchmark {
         } catch (Exception e) {
             System.out.println("Fehler beim laden der MySQL Treiber:"+e);
         }
+        //initialisiere array
+        this.checkedArticle = new ArrayList<String>();
     }
 
-    private int findArticle(String title, int i, Connection conn) throws SQLException {
+    public boolean limitReached() {
+        return (this.articleCount>=this.limit);
+    }
+
+    private int findArticleInSQL(String title, int i, Connection conn) throws SQLException {
+        if (this.limitReached()) return -1;
         i++;
-        //notfallabbruch, um endlosschleife zu verhindern
-        if (i>10000) return -1;
+        //this.addLog(i+": bei limit"+this.limit);
         Statement stmt = (Statement) conn.createStatement();
-        return i;
+        String sqlCommand = "SELECT * FROM articles "+
+                        "WHERE Title = \""+title+"\" LIMIT 1;\n";
+        this.logSQL(sqlCommand);
+        ResultSet articles,texts,links;
+        articles = stmt.executeQuery(sqlCommand);
+        if (articles.next()) {
+            this.addLog("Artikel '"+title+"' ist vorhanden");
+            String articleID = articles.getString("ID");
+            this.articleCount++;
+            //Inhalt suchen
+            sqlCommand = "SELECT * FROM textindex WHERE ArticleID = "+articleID+" LIMIT 1000;";
+            this.addLog("Alle Textabschnitte zu Artikel '"+title+"' raussuchen");
+            this.logSQL(sqlCommand);
+            texts = stmt.executeQuery(sqlCommand);
+            int textsCount=0;
+            while (texts.next()) {
+                textsCount++;
+            }
+            this.addLog("Ins. "+textsCount+" Abschnitte gefunden");
+            //Links suchen
+            sqlCommand = "SELECT * FROM textindex_link WHERE ArticleID = "+articleID+" LIMIT 1000;";
+            this.addLog("Alle Links zu Artikel '"+title+"' raussuchen");
+            this.logSQL(sqlCommand);
+            links = stmt.executeQuery(sqlCommand);
+            int linksCount=0;
+            String nextArticleTitle;
+            int found;
+            while (links.next()) {
+                if (this.checkedArticle.contains(links.getString("Link"))) {
+                    //Artikel wurde bereits aufgerufen
+                } else {
+                    //Artikel wurde noch nicht aufgerufen, also weiter
+                    nextArticleTitle = links.getString("Link");
+                    this.checkedArticle.add(nextArticleTitle);
+                    //abbruch, falls limit erreicht ist
+                    if (i>this.limit) return -1;
+                    else {
+                        return this.findArticleInSQL(nextArticleTitle, i, conn);
+                        //if (found>0) return found;
+                    }
+                }
+                linksCount++;
+            }
+            this.addLog("Ins. "+linksCount+" Verlinkungen gefunden gefunden");
+            //this.addLog(this.checkedArticle.toString());
+        } else {
+            return 0;
+        }
+        //String articleID = "";
+        return -1;
     }
 
     public void searchArticle(String text, int limit) {
@@ -61,39 +118,13 @@ public class WikipediaBenchmark {
                 this.addLog("Öffne MySQL Verbindung");
                 Connection conn = this.openConnection();
                 //Artikel suchen
+                this.articleCount = 0;
                 this.resetTimer();
-                this.findArticle(text, 0, conn);
-                
-                
-                this.resetTimer();
-                String sqlCommand = "SELECT * FROM articles "+
-                        "WHERE Title = \""+text+"\" LIMIT 1;\n";
-                this.logSQL(sqlCommand);
-                
-                ResultSet resultSet;
-                resultSet = stmt.executeQuery(sqlCommand);
-                this.logTimer();
-
-                String articleID = "";
-
-                while (resultSet.next()) {
-                    this.addLog("Artikel '"+resultSet.getString("Title")+"' gefunden");
-                    articleID = resultSet.getString("ID");
+                while (!this.limitReached()) {
+                    this.findArticleInSQL(text, 0, conn);
                 }
-
-                this.addLog("Suche Inhalt zu ArtikelID ='"+articleID+"'");
-                //Inhalt suchen
-                sqlCommand = "SELECT * FROM textindex WHERE ArticleID = "+articleID+" LIMIT 100;";
-                this.logSQL(sqlCommand);
-                this.resetTimer();
-                resultSet = stmt.executeQuery(sqlCommand);
                 this.logTimer();
-
-                String textIndexID="";
-                while (resultSet.next()) {
-                    this.addLog("Alle Links zu Artikel '"+text+"' finden");
-                    articleID = resultSet.getString("ID");
-                }
+                this.addLog("Es wurden insg. "+this.articleCount+" Artikel rausgesucht");
 
             } else {
                 //nosql
@@ -117,7 +148,8 @@ public class WikipediaBenchmark {
     }
 
     public void startTimer() {
-        this.startTime=System.nanoTime();
+        //this.startTime=System.nanoTime();
+        this.startTime=System.currentTimeMillis();
     }
 
     public void resetTimer() {
@@ -125,7 +157,7 @@ public class WikipediaBenchmark {
     }
 
     public long measureTimer() {
-        this.stopTime=System.nanoTime();
+        this.stopTime=System.currentTimeMillis();
         long difference = this.stopTime-this.startTime;
         //this.timeStack.add(difference);
         difference=Math.round(difference);
@@ -134,7 +166,8 @@ public class WikipediaBenchmark {
 
     public void logTimer() {
         double time = this.measureTimer();
-        time = time/10000000;
+        time = Math.round(time);
+        time = time/1000;
         this.addLog("Gemessene Zeit: "+time+" [s]");
     }
 
