@@ -45,8 +45,11 @@ public class WikipediaBenchmark {
         }
     }
 
-    private int findArticle(String title, int i, Connection conn) {
-        
+    private int findArticle(String title, int i, Connection conn) throws SQLException {
+        i++;
+        //notfallabbruch, um endlosschleife zu verhindern
+        if (i>10000) return -1;
+        Statement stmt = (Statement) conn.createStatement();
         return i;
     }
 
@@ -57,14 +60,16 @@ public class WikipediaBenchmark {
             if (this.isSQL()) {
                 this.addLog("Öffne MySQL Verbindung");
                 Connection conn = this.openConnection();
-                this.findArticle(text, 0, conn);
-                Statement stmt = (Statement) conn.createStatement();
                 //Artikel suchen
+                this.resetTimer();
+                this.findArticle(text, 0, conn);
+                
+                
                 this.resetTimer();
                 String sqlCommand = "SELECT * FROM articles "+
                         "WHERE Title = \""+text+"\" LIMIT 1;\n";
                 this.logSQL(sqlCommand);
-                this.resetTimer();
+                
                 ResultSet resultSet;
                 resultSet = stmt.executeQuery(sqlCommand);
                 this.logTimer();
