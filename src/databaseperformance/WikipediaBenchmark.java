@@ -1,8 +1,3 @@
-/*
- * To change this template, choose Tools | Templates
- * and open the template in the editor.
- */
-
 package databaseperformance;
 
 //import java.sql.Connection;
@@ -16,6 +11,13 @@ import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.*;
+
+import com.mongodb.Mongo;
+import com.mongodb.DB;
+import com.mongodb.DBCollection;
+import com.mongodb.BasicDBObject;
+import com.mongodb.DBObject;
+import com.mongodb.DBCursor;
 
 /**
  *
@@ -38,6 +40,7 @@ public class WikipediaBenchmark {
     private long stopTime = 0;
     private ArrayList<Number> timeStack;
     private ArrayList<String> checkedArticle;
+    private ArrayList<String> finalLogs;
 
     public WikipediaBenchmark() {
         try {
@@ -47,16 +50,53 @@ public class WikipediaBenchmark {
         }
         //initialisiere array
         this.checkedArticle = new ArrayList<String>();
+        this.finalLogs = new ArrayList<String>();
     }
 
     public boolean limitReached() {
         return (this.articleCount>=this.limit);
     }
 
+    private int findArticleInNoSQL(String title, int i, DB db) {
+        if (this.limitReached()) return -1;
+        i++;
+        
+        DBCollection articles = db.getCollection("textindex");
+        BasicDBObject query = new BasicDBObject("article", title);
+        DBCursor article = articles.find(query);
+        this.logNoSQL("db.textindex.find({article:'"+title+"'});");
+        if (article.size()>0) this.articleCount++;
+        else return -1;
+        this.addLog("Suche alle Absätze zu dem Artikel '"+title+"' raus");
+        String nextArticleTitle = "";
+        while(article.hasNext()) {          
+            BasicDBObject paragraph = (BasicDBObject) article.next();
+            List<Object> links = (List<Object>) paragraph.get("link");
+            this.addLog("Es wurden "+links.size()+" Verlinkungen im Absatz gefunden");
+            for (Object link : links) {
+                //System.out.println(link);
+                if (this.checkedArticle.contains((String)link)) {
+                    //Artikel wurde bereits aufgerufen
+                } else {
+                    //Artikel wurde noch nicht aufgerufen, also weiter
+                    
+                    nextArticleTitle = link.toString();
+                    
+                    this.checkedArticle.add(nextArticleTitle);
+                    //abbruch, falls limit erreicht ist
+                    if (i>this.limit) return -1;
+                    else {
+                        return this.findArticleInNoSQL(nextArticleTitle, i, db);
+                    }
+                }
+            }
+        }
+        return -1;
+    }
+
     private int findArticleInSQL(String title, int i, Connection conn) throws SQLException {
         if (this.limitReached()) return -1;
         i++;
-        //this.addLog(i+": bei limit"+this.limit);
         Statement stmt = (Statement) conn.createStatement();
         String sqlCommand = "SELECT * FROM articles "+
                         "WHERE Title = \""+title+"\" LIMIT 1;\n";
@@ -96,13 +136,11 @@ public class WikipediaBenchmark {
                     if (i>this.limit) return -1;
                     else {
                         return this.findArticleInSQL(nextArticleTitle, i, conn);
-                        //if (found>0) return found;
                     }
                 }
                 linksCount++;
             }
             this.addLog("Ins. "+linksCount+" Verlinkungen gefunden gefunden");
-            //this.addLog(this.checkedArticle.toString());
         } else {
             return 0;
         }
@@ -114,21 +152,38 @@ public class WikipediaBenchmark {
         this.startTimer();
         this.limit=limit;
         try {
-            if (this.isSQL()) {
-                this.addLog("Öffne MySQL Verbindung");
-                Connection conn = this.openConnection();
-                //Artikel suchen
-                this.articleCount = 0;
-                this.resetTimer();
-                while (!this.limitReached()) {
-                    this.findArticleInSQL(text, 0, conn);
-                }
-                this.logTimer();
-                this.addLog("Es wurden insg. "+this.articleCount+" Artikel rausgesucht");
-
-            } else {
-                //nosql
+            //mysql
+            this.type="mysql";
+            this.addLog("Öffne MySQL Verbindung");
+            Connection conn = this.openConnection();
+            this.checkedArticle = new ArrayList<String>();
+            this.articleCount = 0;
+            //Artikel suchen
+            this.articleCount = 0;
+            this.resetTimer();
+            while (!this.limitReached()) {
+                this.findArticleInSQL(text, this.articleCount, conn);
             }
+            this.addFinalLog(this.logTimer(" für MySQL"));
+            this.addFinalLog(this.addLog("Es wurden insg. "+this.articleCount+" Artikel via MySQL rausgesucht"));
+
+            //nosql
+            this.type="mongodb";
+            this.addLog("Öffne mongodb Verbindung");
+            Mongo m = new Mongo();
+            DB db = m.getDB( "wikipedia" );
+            this.checkedArticle = new ArrayList<String>();
+            this.articleCount = 0;
+            this.resetTimer();
+            while (!this.limitReached()) {
+                this.findArticleInNoSQL(text, this.articleCount, db);
+            }
+            this.addFinalLog(this.logTimer("für mongodb"));
+            this.addFinalLog(this.addLog("Es wurden insg. "+this.articleCount+" Artikel via mongodb rausgesucht"));
+            System.out.println("========");
+            System.out.println(this.getFinalLogMessage());
+            System.out.println("========");
+            
         } catch (Exception e) {
             System.out.println("Fehler bei der Abfrage der Datenbank: "+e.getMessage());
         }
@@ -137,6 +192,16 @@ public class WikipediaBenchmark {
     private String addLog(String message) {
         System.out.println(">"+message+"...");
         return message;
+    }
+
+    public String addFinalLog(String message) {
+        this.finalLogs.add(message);
+        //return this.addLog(message);
+        return message;
+    }
+
+    public String getFinalLogMessage() {
+        return this.finalLogs.toString();
     }
 
     public Boolean isSQL() {
@@ -164,15 +229,25 @@ public class WikipediaBenchmark {
         return difference;
     }
 
-    public void logTimer() {
+    public String logTimer() {
+        return logTimer("");
+    }
+
+    public String logTimer(String message) {
         double time = this.measureTimer();
         time = Math.round(time);
         time = time/1000;
-        this.addLog("Gemessene Zeit: "+time+" [s]");
+        message = "Gemessene Zeit: "+time+" [s] "+message;
+        this.addLog(message);
+        return message;
     }
 
     public void logSQL(String sql) {
-        this.addLog("[SQL]"+sql);
+        this.addLog("mysql> "+sql);
+    }
+
+    public void logNoSQL(String command) {
+        this.addLog("mongodb> "+command);
     }
 
     public long countTimer() {

@@ -1,15 +1,10 @@
-/*
- * To change this template, choose Tools | Templates
- * and open the template in the editor.
- */
-
 package databaseperformance;
 
 import java.io.*;
 
 /**
  *
- * @author philipp
+ * @author Philipp Ständer
  */
 public class Main {
 
@@ -31,7 +26,7 @@ public class Main {
 
             while (!(limit>=1)) {
                 System.out.print("Max. Abfragen (z.B. 1000): ");
-                lineOfText = new BufferedReader(new InputStreamReader(System.in));
+                lineOfText = new BufferedReader(new InputStreamReader(System.in,"UTF-8"));
                 limit = Integer.parseInt(lineOfText.readLine());
             }
             
@@ -52,7 +47,7 @@ public class Main {
             System.out.println("fertig");
 
         } catch (Exception e) {
-         e.printStackTrace();
+            e.printStackTrace();
         }
     }
 
