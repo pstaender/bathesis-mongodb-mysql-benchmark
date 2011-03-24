@@ -1,5 +1,7 @@
 package databaseperformance;
 
+//Rekursion auf eine Ebene beschränken
+
 //import java.sql.Connection;
 //import java.sql.DriverManager;
 //import java.sql.SQLException;
@@ -63,6 +65,13 @@ public class WikipediaBenchmark {
         
         DBCollection articles = db.getCollection("textindex");
         BasicDBObject query = new BasicDBObject("article", title);
+
+        //DBCollection completeArticles = db.getCollection("articles");
+        //BasicDBObject completeArticleQuery = new BasicDBObject("title", title);
+        //DBObject completeArticle = completeArticles.findOne(query);
+
+        //this.addLog("Kompletter Artikel:"+completeArticle.toString());
+
         DBCursor article = articles.find(query);
         this.logNoSQL("db.textindex.find({article:'"+title+"'});");
         if (article.size()>0) this.articleCount++;
