@@ -38,11 +38,16 @@ public class Main {
             WikipediaBenchmark bench = new WikipediaBenchmark();
             bench.startTimer();
             bench.type="mysql";
-            bench.username="readwikipedia";
-            bench.password="readwikipedia";
-            bench.database="mongodb";
+            bench.username="root";
+            bench.password="root";
+            bench.database="nosql";
+            bench.logNoSQL=true;
+            bench.logSQL=true;
+            bench.useRegularExpressions=true;
+            bench.searchInSubtitles=false;
             
-            bench.searchArticle(searchtext,limit);
+//            bench.searchArticleInMySQL(searchtext,limit);
+            bench.searchArticleInMongoDB(searchtext,limit);
 
             System.out.println("fertig");
 
