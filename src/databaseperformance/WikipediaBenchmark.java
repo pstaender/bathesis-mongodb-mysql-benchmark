@@ -37,8 +37,9 @@ public class WikipediaBenchmark {
     public boolean logVerbose = false;
     public boolean logNoSQL = false;
     public boolean log = true;
+    public String outputFormat = "";
 
-    public int limit = 1000;
+    public int limit = 100;
     private int articleCount = 0;
 
     private long startTime = 0;
@@ -51,7 +52,8 @@ public class WikipediaBenchmark {
         try {
             Class.forName("org.gjt.mm.mysql.Driver").newInstance();
         } catch (Exception e) {
-            System.out.println("Fehler beim laden der MySQL Treiber: "+e.getMessage());
+            System.err.println("Fehler beim laden der MySQL Treiber: "+e.getMessage());
+            System.exit(-1);
         }
         //initialisiere array
         this.checkedArticle = new ArrayList<String>();
@@ -86,7 +88,7 @@ public class WikipediaBenchmark {
         String nextArticleTitle = "";
         
         List<Object> links = (List<Object>) article.get("links");
-        this.addOptionalLog("Insg. "+links.size()+" Verlinkungen im Artikel '"+title+"' gefunden");
+        this.addLog(links.size()+" Verlinkungen im Artikel '"+title+"' gefunden");
         for (Object link : links) {
             if (this.checkedArticle.contains((String)link)) {
                 //Artikel wurde bereits aufgerufen
@@ -131,7 +133,7 @@ public class WikipediaBenchmark {
             //Links suchen
             this.logSQL(sqlCommand);
             String[] links = articles.getString("Links").split(",");
-            this.addOptionalLog("Insg. "+links.length+" Verlinkungen im Artikel '"+title+"' gefunden");
+            this.addLog(links.length+" Verlinkungen im Artikel '"+title+"' gefunden");
             
             int linksCount=0;
             String nextArticleTitle;
@@ -176,8 +178,12 @@ public class WikipediaBenchmark {
             while (!this.limitReached()) {
                 this.findArticleInSQL(text, this.articleCount, conn);
             }
-            this.addFinalLog(this.logTimer("MySQL"));
-            this.addLog(this.addLog("Es wurden insg. "+this.articleCount+" Artikel via MySQL rausgesucht"));
+            if (this.outputIsCSV()) {
+                this.addFinalLog(this.logTimer());
+            } else {
+                this.addFinalLog(this.logTimer()+"[s]  \tMySQL");
+            }
+            this.addLog("Es wurden insg. "+this.articleCount+" Artikel via MySQL rausgesucht");
         } catch (Exception e) {
             System.err.println("Fehler bei der Abfrage der MySQL-DB: "+e.getMessage());
             System.exit(-1);
@@ -200,11 +206,22 @@ public class WikipediaBenchmark {
             while (!this.limitReached()) {
                 this.findArticleInNoSQL(text, this.articleCount, db);
             }
-            this.addFinalLog(this.logTimer("MongoDB"));
-            this.addLog(this.addLog("Es wurden insg. "+this.articleCount+" Artikel via mongodb rausgesucht"));
-            System.out.println("========");
-            System.out.println(this.getFinalLogMessage());
-            System.out.println("========");
+            if (this.outputIsCSV()) {
+                this.addFinalLog(this.logTimer());
+            } else {
+                this.addFinalLog(this.logTimer()+"[s]  \tMongoDB");
+            }
+            this.addLog("Es wurden insg. "+this.articleCount+" Artikel via mongodb rausgesucht");
+            if (this.outputFormat.equals("csv")) {
+                for (Object line : this.finalLogs) {
+                    System.out.print(line+";");
+                }
+            } else {
+                System.out.println("========");
+                System.out.println(this.getFinalLogMessage());
+                System.out.println("========");
+            }
+            
             
         } catch (Exception e) {
             System.err.println("Fehler bei der Abfrage der MongoDB: "+e.getMessage());
@@ -242,9 +259,12 @@ public class WikipediaBenchmark {
     public Boolean isNoSQL() {
         return !(this.isSQL());
     }
+    
+    public Boolean outputIsCSV() {
+        return (this.outputFormat.toLowerCase().equals("csv"));
+    }
 
     public void startTimer() {
-        //this.startTime=System.nanoTime();
         this.startTime=System.currentTimeMillis();
     }
 
@@ -255,7 +275,6 @@ public class WikipediaBenchmark {
     public long measureTimer() {
         this.stopTime=System.currentTimeMillis();
         long difference = this.stopTime-this.startTime;
-        //this.timeStack.add(difference);
         difference=Math.round(difference);
         return difference;
     }
@@ -268,7 +287,7 @@ public class WikipediaBenchmark {
         double time = this.measureTimer();
         time = Math.round(time);
         time = time/1000;
-        message = time+" [s] \t"+message;
+        message = time+message;
         this.addLog(message);
         return message;
     }
@@ -290,11 +309,6 @@ public class WikipediaBenchmark {
     private Connection openConnection() {
         if (this.isSQL()) {
             String dbURL = "jdbc:mysql://"+this.host+":"+this.port+"/"+this.database;
-            //try {
-            //    Class.forName("com.mysql.jdbc.Driver").newInstance();
-            //} catch(Exception e) {
-            //    System.out.println("Fehler beim Laden der MySQL Klasse:"+e.getMessage());
-            //}
             try {
                 Connection conn = (Connection) DriverManager.getConnection(dbURL,this.username,this.password);
                 return conn;
@@ -314,7 +328,6 @@ public class WikipediaBenchmark {
 		final int len = str.length();
 		StringBuffer sql = new StringBuffer(len * 2);
 		synchronized (sql) { //only for StringBuffer
-		//sql.append('\'');
 		for (int i = 0; i < len; i++) {
 			char c = str.charAt(i);
 			switch (c) {
@@ -340,7 +353,6 @@ public class WikipediaBenchmark {
 				break;
 			}
 		}
-		//sql.append('\'');
 		return sql.toString();
 		}
 	}

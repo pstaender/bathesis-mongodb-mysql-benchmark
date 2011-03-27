@@ -37,6 +37,7 @@ public class Main {
             System.out.println("-sGeschichte  Nach Unterueberschrift suchen, hier z.B. Geschichte");
             System.out.println("-cTo_be_or    Inhalt durchsuchen");
             System.out.println("--silent      Keine Erklaerungen");
+            System.out.println("--formatCSV   Ausgabeformat (Optionen bis jetz: CSV)");
 //            System.out.println("Bei Arbeitsspeicherproblemen kann folgender Ausfuehrungsparameter helfen:");
 //            System.out.println("java -Xms1024m -Xmx2048m -XX:NewSize=256m -XX:MaxNewSize=256m -XX:+UseConcMarkSweepGC -XX:+UseParNewGC -XX:PermSize=128m -XX:MaxPermSize=128m -jar ...");
             System.out.println("");
@@ -51,6 +52,7 @@ public class Main {
             String useRegularExpression = "";
             String searchInSubtitles = "";
             String searchtext = "";
+            String outputFormat = "";
             boolean searchInContent = false;
             
             BufferedReader lineOfText = new BufferedReader(new InputStreamReader(System.in));
@@ -84,6 +86,9 @@ public class Main {
                 }
                 if(Pattern.matches("^--exact$", next)) {
                     useRegularExpression = "n";
+                }
+                if(Pattern.matches("^--format.+", next)) {
+                    outputFormat = next.substring(8).toLowerCase();
                 }
             }
  
@@ -141,14 +146,16 @@ public class Main {
             bench.useRegularExpressions=(useRegularExpression.equals("j"));
             bench.searchInSubtitles=(searchInSubtitles.equals("u"));
             bench.searchInContent=searchInContent;
-            if (bench.searchInContent) bench.useRegularExpressions=true;
+            bench.outputFormat=outputFormat;
             
+            if (bench.searchInContent) bench.useRegularExpressions=true;
             if (!(arguments.contains("--silent"))) {
                 System.out.println("Suchbegriff: " + searchtext);
                 System.out.println("Maximal Abfragen: " + limit);
                 bench.log = true;
             } else {
                 bench.log = false;
+                bench.logVerbose = false;
             }
 
             if ((databaseType.equals("s")) || (databaseType.equals("a"))) bench.searchArticleInMySQL(searchtext,limit);
