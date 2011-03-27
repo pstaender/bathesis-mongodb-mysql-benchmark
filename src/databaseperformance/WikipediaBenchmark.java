@@ -31,9 +31,12 @@ public class WikipediaBenchmark {
     public String host = "localhost";
     public int port = 3306;
     public boolean searchInSubtitles = false;
+    public boolean searchInContent = false;
     public boolean useRegularExpressions = false;
     public boolean logSQL = false;
+    public boolean logVerbose = false;
     public boolean logNoSQL = false;
+    public boolean log = true;
 
     public int limit = 1000;
     private int articleCount = 0;
@@ -48,7 +51,7 @@ public class WikipediaBenchmark {
         try {
             Class.forName("org.gjt.mm.mysql.Driver").newInstance();
         } catch (Exception e) {
-            System.out.println("Fehler beim laden der MySQL Treiber:"+e);
+            System.out.println("Fehler beim laden der MySQL Treiber: "+e.getMessage());
         }
         //initialisiere array
         this.checkedArticle = new ArrayList<String>();
@@ -63,33 +66,33 @@ public class WikipediaBenchmark {
         if (this.limitReached()) return -1;
         i++;
         DBCollection articles = db.getCollection("articles");
-        String searchField = ((this.searchInSubtitles) ? "sections.subtitle" : "title");
-//        BasicDBObject query = new BasicDBObject(searchField, title);
+        String searchField = "title";
+        if (this.searchInSubtitles) searchField = "sections.subtitle";
+        if (this.searchInContent) searchField = "section.content";
         BasicDBObject query = new BasicDBObject(
                 searchField,
-                ((this.useRegularExpressions) ? Pattern.compile(title) : title) 
+                ((this.useRegularExpressions) ? Pattern.compile(title, Pattern.CASE_INSENSITIVE) : title) 
                 );
 
-        DBCursor article = articles.find(query);
-        if (this.useRegularExpressions) this.logNoSQL("db.articles.find({\""+searchField+"\":/"+title+"/i});");
-        else this.logNoSQL("db.articles.find({\""+searchField+"\":'"+title+"'});");
-        if (article.hasNext()) this.articleCount++;
+        
+        if (this.useRegularExpressions) this.logNoSQL("db.articles.find({\""+searchField+"\":/"+title+"/});");
+        else this.logNoSQL("db.articles.findOne({\""+searchField+"\":'"+title+"'});");
+        
+        DBObject article = articles.findOne(query);
+        
+        if (article != null) this.articleCount++;
         else return -1;
         
         String nextArticleTitle = "";
         
-        List<Object> links = (List<Object>) article.next().get("links");
-        this.addLog("Es wurden "+links.size()+" Verlinkungen im Artikel gefunden");
+        List<Object> links = (List<Object>) article.get("links");
+        this.addOptionalLog("Insg. "+links.size()+" Verlinkungen im Artikel '"+title+"' gefunden");
         for (Object link : links) {
-            
-            //System.out.println(link);
             if (this.checkedArticle.contains((String)link)) {
                 //Artikel wurde bereits aufgerufen
             } else {
                 //Artikel wurde noch nicht aufgerufen, also weiter
-
                 nextArticleTitle = link.toString();
-
                 this.checkedArticle.add(nextArticleTitle);
                 //abbruch, falls limit erreicht ist
                 if (i>this.limit) return -1;
@@ -105,26 +108,30 @@ public class WikipediaBenchmark {
         if (this.limitReached()) return -1;
         i++;
         Statement stmt = (Statement) conn.createStatement();
-        String whereCondition = "";
-        if (this.searchInSubtitles) whereCondition = "Content";
-        else whereCondition = "Title";
-        if (this.useRegularExpressions) whereCondition += " LIKE \"%**title**%\"";
+        String whereCondition = "Title";
+        String sqlTitle = title;
+        if (this.searchInSubtitles) {
+            whereCondition = "Content";
+            sqlTitle = "== "+title+" ==";
+        }
+        if (this.searchInContent) {
+            whereCondition = "Content";
+        }
+        if ((this.useRegularExpressions) || (this.searchInSubtitles)) whereCondition += " LIKE \"%**title**%\"";
         else whereCondition += " = \"**title**\"";
-        whereCondition = whereCondition.replace("**title**",title);
+        whereCondition = whereCondition.replace("**title**",WikipediaBenchmark.sqlEscape(sqlTitle));
         String sqlCommand = "SELECT * FROM articles "+
                         "WHERE "+whereCondition+" LIMIT 1;\n";
         this.logSQL(sqlCommand);
         ResultSet articles,texts;
         articles = stmt.executeQuery(sqlCommand);
         if (articles.next()) {
-            this.addLog("Artikel '"+title+"' ist vorhanden");
             String articleID = articles.getString("ID");
             this.articleCount++;
             //Links suchen
-            
-            this.addLog("Alle Links zu Artikel '"+title+"' raussuchen");
             this.logSQL(sqlCommand);
             String[] links = articles.getString("Links").split(",");
+            this.addOptionalLog("Insg. "+links.length+" Verlinkungen im Artikel '"+title+"' gefunden");
             
             int linksCount=0;
             String nextArticleTitle;
@@ -145,7 +152,6 @@ public class WikipediaBenchmark {
                 }
                 linksCount++;
             }
-            this.addLog("Ins. "+linksCount+" Verlinkungen gefunden gefunden");
         } else {
             return 0;
         }
@@ -159,18 +165,19 @@ public class WikipediaBenchmark {
         try {
             //mysql
             this.type="mysql";
-            this.addLog("Öffne MySQL Verbindung");
+            this.addLog("Oeffne MySQL Verbindung");
             Connection conn = this.openConnection();
             this.checkedArticle = new ArrayList<String>();
             this.articleCount = 0;
             //Artikel suchen
             this.articleCount = 0;
+            this.addLog("Start mysql Bechnmark...");
             this.resetTimer();
             while (!this.limitReached()) {
                 this.findArticleInSQL(text, this.articleCount, conn);
             }
-            this.addFinalLog(this.logTimer(" für MySQL"));
-            this.addFinalLog(this.addLog("Es wurden insg. "+this.articleCount+" Artikel via MySQL rausgesucht"));
+            this.addFinalLog(this.logTimer("MySQL"));
+            this.addLog(this.addLog("Es wurden insg. "+this.articleCount+" Artikel via MySQL rausgesucht"));
         } catch (Exception e) {
             System.err.println("Fehler bei der Abfrage der MySQL-DB: "+e.getMessage());
             System.exit(-1);
@@ -183,17 +190,18 @@ public class WikipediaBenchmark {
         try {
             //nosql
             this.type="mongodb";
-            this.addLog("Öffne mongodb Verbindung");
+            this.addLog("Oeffne mongodb Verbindung");
             Mongo m = new Mongo();
             DB db = m.getDB( "wikipedia" );
             this.checkedArticle = new ArrayList<String>();
             this.articleCount = 0;
+            this.addLog("Start mongodb Bechnmark...");
             this.resetTimer();
             while (!this.limitReached()) {
                 this.findArticleInNoSQL(text, this.articleCount, db);
             }
-            this.addFinalLog(this.logTimer("für mongodb"));
-            this.addFinalLog(this.addLog("Es wurden insg. "+this.articleCount+" Artikel via mongodb rausgesucht"));
+            this.addFinalLog(this.logTimer("MongoDB"));
+            this.addLog(this.addLog("Es wurden insg. "+this.articleCount+" Artikel via mongodb rausgesucht"));
             System.out.println("========");
             System.out.println(this.getFinalLogMessage());
             System.out.println("========");
@@ -205,18 +213,26 @@ public class WikipediaBenchmark {
     }
 
     private String addLog(String message) {
-        System.out.println(message);
+        if (this.log) System.out.println(message);
+        return message;
+    }
+    
+    private String addOptionalLog(String message) {
+        if (this.logVerbose) System.out.println(message);
         return message;
     }
 
     public String addFinalLog(String message) {
         this.finalLogs.add(message);
-        //return this.addLog(message);
         return message;
     }
 
     public String getFinalLogMessage() {
-        return this.finalLogs.toString();
+        String message = "";
+        for (Object line : this.finalLogs) {
+            message += line+"\n";
+        }
+        return message.trim();
     }
 
     public Boolean isSQL() {
@@ -252,7 +268,7 @@ public class WikipediaBenchmark {
         double time = this.measureTimer();
         time = Math.round(time);
         time = time/1000;
-        message = "Gemessene Zeit: "+time+" [s] "+message;
+        message = time+" [s] \t"+message;
         this.addLog(message);
         return message;
     }
@@ -291,6 +307,43 @@ public class WikipediaBenchmark {
         }
         return null;
     }
+    
+    public static String sqlEscape(String str) {
+		if (str.length() == 0)
+			return ""; //TODO "NULL",too ?
+		final int len = str.length();
+		StringBuffer sql = new StringBuffer(len * 2);
+		synchronized (sql) { //only for StringBuffer
+		//sql.append('\'');
+		for (int i = 0; i < len; i++) {
+			char c = str.charAt(i);
+			switch (c) {
+			case '\u0000':
+				sql.append('\\').append('0');
+				break;
+			case '\n':
+				sql.append('\\').append('n');
+				break;
+			case '\r':
+				sql.append('\\').append('r');
+				break;
+			case '\u001a':
+				sql.append('\\').append('Z');
+				break;
+			case '"':
+			case '\'':
+			case '\\':
+				sql.append('\\');
+				// fall through
+			default:
+				sql.append(c);
+				break;
+			}
+		}
+		//sql.append('\'');
+		return sql.toString();
+		}
+	}
 
     
 }
