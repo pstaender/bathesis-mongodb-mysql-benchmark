@@ -31,6 +31,6 @@ to get a list of all available parameters:
 
 ### Translation
 
-Everything is in german now, sorry.
+For now everything is in german, sorry... but feel free to translate :)
 
 [1]: http://svn.wikimedia.org/svnroot/mediawiki/trunk/mwdumper/
