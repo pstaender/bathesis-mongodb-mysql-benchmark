@@ -17,8 +17,7 @@ public class Main {
      * @param args the command line arguments
      */
     public static void main(String[] args) {
-        //ermögliche das empfangen von Texteingabe
-        //StreamTokenizer Input=new StreamTokenizer(System.in);
+        //werte die argumente der konsole aus
         List<String> arguments = Arrays.asList(args);
         if (!(arguments.contains("--silent"))) {
             System.out.println("****** Wikipedia MySQL/MongoDB Benchmarktest *****");
@@ -38,8 +37,6 @@ public class Main {
             System.out.println("-cTo_be_or    Inhalt durchsuchen");
             System.out.println("--silent      Keine Erklaerungen");
             System.out.println("--formatCSV   Ausgabeformat (Optionen bis jetz: CSV)");
-//            System.out.println("Bei Arbeitsspeicherproblemen kann folgender Ausfuehrungsparameter helfen:");
-//            System.out.println("java -Xms1024m -Xmx2048m -XX:NewSize=256m -XX:MaxNewSize=256m -XX:+UseConcMarkSweepGC -XX:+UseParNewGC -XX:PermSize=128m -XX:MaxPermSize=128m -jar ...");
             System.out.println("");
             System.exit(0);
         }
@@ -134,12 +131,17 @@ public class Main {
                 System.out.println("Gewaehlte Option: ["+searchInSubtitles+"]");
             }
             
+            
+            //Erstelle Benchmarktest mit den angeforderten Parametern
             WikipediaBenchmark bench = new WikipediaBenchmark();
             bench.startTimer();
-            bench.type="mysql";
-            bench.username="root";
-            bench.password="root";
-            bench.database="nosql";
+            //zugangsdaten fuer mysql, fuer mongodb wird keine benutzer-authent. erwartet
+            bench.mysqlUsername="root";
+            bench.mysqlPassword="root";
+            bench.mysqlTable="articles";
+            bench.sqlDatabase="nosql";
+            bench.nosqlCollection="articles";
+            bench.nosqlDatabase="wikipedia";
             bench.logNoSQL=(arguments.contains("-v"));
             bench.logSQL=(arguments.contains("-v"));
             bench.logVerbose=(arguments.contains("-v"));

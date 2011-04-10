@@ -23,13 +23,15 @@ import com.mongodb.DBCursor;
  */
 public class WikipediaBenchmark {
 
-    public String type = "mysql";
-    public String database = "";
-    public String collection = "";
-    public String username = "root";
-    public String password = "root";
-    public String host = "localhost";
-    public int port = 3306;
+    public String type = "";
+    public String sqlDatabase = "";
+    public String nosqlDatabase = "";
+    public String nosqlCollection = "";
+    public String mysqlTable = "";
+    public String mysqlUsername = "root";
+    public String mysqlPassword = "root";
+    public String mysqlHost = "localhost";
+    public int mysqlPort = 3306;
     public boolean searchInSubtitles = false;
     public boolean searchInContent = false;
     public boolean useRegularExpressions = false;
@@ -67,7 +69,7 @@ public class WikipediaBenchmark {
     private int findArticleInNoSQL(String title, int i, DB db) {
         if (this.limitReached()) return -1;
         i++;
-        DBCollection articles = db.getCollection("articles");
+        DBCollection articles = db.getCollection(this.nosqlCollection);
         String searchField = "title";
         if (this.searchInSubtitles) searchField = "sections.subtitle";
         if (this.searchInContent) searchField = "section.content";
@@ -123,7 +125,7 @@ public class WikipediaBenchmark {
         if ((this.useRegularExpressions) || (this.searchInSubtitles)) whereCondition += " LIKE \"%**title**%\"";
         else whereCondition += " = \"**title**\"";
         whereCondition = whereCondition.replace("**title**",WikipediaBenchmark.sqlEscape(sqlTitle));
-        String sqlCommand = "SELECT * FROM articles "+
+        String sqlCommand = "SELECT * FROM "+this.mysqlTable+" "+
                         "WHERE "+whereCondition+" LIMIT 1;\n";
         this.logSQL(sqlCommand);
         ResultSet articles,texts;
@@ -199,7 +201,7 @@ public class WikipediaBenchmark {
             this.type="mongodb";
             this.addLog("Oeffne mongodb Verbindung");
             Mongo m = new Mongo();
-            DB db = m.getDB( "wikipedia" );
+            DB db = m.getDB( this.nosqlDatabase );
             this.checkedArticle = new ArrayList<String>();
             this.articleCount = 0;
             this.addLog("Start mongodb Bechnmark...");
@@ -309,9 +311,9 @@ public class WikipediaBenchmark {
 
     private Connection openConnection() {
         if (this.isSQL()) {
-            String dbURL = "jdbc:mysql://"+this.host+":"+this.port+"/"+this.database;
+            String dbURL = "jdbc:mysql://"+this.mysqlHost+":"+this.mysqlPort+"/"+this.sqlDatabase;
             try {
-                Connection conn = (Connection) DriverManager.getConnection(dbURL,this.username,this.password);
+                Connection conn = (Connection) DriverManager.getConnection(dbURL,this.mysqlUsername,this.mysqlPassword);
                 return conn;
                 } catch (SQLException ex) {
                 // handle any errors
