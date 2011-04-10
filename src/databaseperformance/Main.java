@@ -138,19 +138,25 @@ public class Main {
             //zugangsdaten fuer mysql, fuer mongodb wird keine benutzer-authent. erwartet
             bench.mysqlUsername="root";
             bench.mysqlPassword="root";
+            //setze die tabellen/collection und datenbank namen fest
             bench.mysqlTable="articles";
             bench.sqlDatabase="nosql";
             bench.nosqlCollection="articles";
             bench.nosqlDatabase="wikipedia";
+            //logging level festlegen
             bench.logNoSQL=(arguments.contains("-v"));
             bench.logSQL=(arguments.contains("-v"));
             bench.logVerbose=(arguments.contains("-v"));
+            //suchgenauigkeit
             bench.useRegularExpressions=(useRegularExpression.equals("j"));
+            //welches feld soll durchsucht werden
             bench.searchInSubtitles=(searchInSubtitles.equals("u"));
             bench.searchInContent=searchInContent;
             bench.outputFormat=outputFormat;
             
+            //wenn inhalt dursucht wird, werden auto. reguläre ausdrücke verwendet
             if (bench.searchInContent) bench.useRegularExpressions=true;
+            //silentmodus ja/nein
             if (!(arguments.contains("--silent"))) {
                 System.out.println("Suchbegriff: " + searchtext);
                 System.out.println("Maximal Abfragen: " + limit);
@@ -160,7 +166,9 @@ public class Main {
                 bench.logVerbose = false;
             }
 
+            //durchsuche mysql
             if ((databaseType.equals("s")) || (databaseType.equals("a"))) bench.searchArticleInMySQL(searchtext,limit);
+            //durchsuche mongodb
             if ((databaseType.equals("n")) || (databaseType.equals("a"))) bench.searchArticleInMongoDB(searchtext,limit);
 
             if (!(arguments.contains("--silent"))) {

@@ -50,6 +50,10 @@ public class WikipediaBenchmark {
     private ArrayList<String> checkedArticle;
     private ArrayList<String> finalLogs;
 
+    /**
+     * Konstruktur
+     * Öffnet die mySQL Treiber und initalisiert Arraylisten
+     */
     public WikipediaBenchmark() {
         try {
             Class.forName("org.gjt.mm.mysql.Driver").newInstance();
@@ -62,10 +66,22 @@ public class WikipediaBenchmark {
         this.finalLogs = new ArrayList<String>();
     }
 
+    /**
+     * Gibt zurück, ob das Limit erreicht ist
+     * @return true if more articles found then set
+     */
     public boolean limitReached() {
         return (this.articleCount>=this.limit);
     }
-
+    
+    /**
+     * Methode durchsucht die NoSQL Datenbank nach dem Suchbegriff
+     * Sie wird rekursiv aufgerufen, bis das Limit erreicht ist
+     * @param title Suchbegriff
+     * @param i Zähler für das Limit
+     * @param db Datenbankinstanz
+     * @return -1 Wenn Limit erreicht ist
+     */
     private int findArticleInNoSQL(String title, int i, DB db) {
         if (this.limitReached()) return -1;
         i++;
@@ -107,6 +123,16 @@ public class WikipediaBenchmark {
         }
         return -1;
     }
+    
+    /**
+     * Methode durchsucht die SQL Datenbank nach dem Suchbegriff
+     * Sie wird rekursiv aufgerufen, bis das Limit erreicht ist
+     * @param title Suchbegriff
+     * @param i Zähler für das Limit
+     * @param conn Datenbankinstanz
+     * @return -1 Wenn Limit erreicht ist
+     * @throws SQLException 
+     */
 
     private int findArticleInSQL(String title, int i, Connection conn) throws SQLException {
         if (this.limitReached()) return -1;
@@ -160,10 +186,14 @@ public class WikipediaBenchmark {
         } else {
             return 0;
         }
-        //String articleID = "";
         return -1;
     }
 
+    /**
+     * Hauptmethode, welche den Geschwindigkeitstest in der MySQL startet und die Zeit misst
+     * @param text Suchbegriff
+     * @param limit Maximales Limit
+     */
     public void searchArticleInMySQL(String text, int limit) {
         this.startTimer();
         this.limit=limit;
@@ -193,6 +223,11 @@ public class WikipediaBenchmark {
         }
     }
     
+    /**
+     * Hauptmethode, welche den Geschwindigkeitstest in der MongoDB startet und die Zeit misst
+     * @param text Suchbegriff
+     * @param limit Maximales Limit
+     */
     public void searchArticleInMongoDB(String text, int limit) {
         this.startTimer();
         this.limit=limit;
@@ -232,21 +267,41 @@ public class WikipediaBenchmark {
         }
     }
 
+    /**
+     * Fügt einen Text zum Log hinzu
+     * @param message
+     * @return Hinzugefügte Nachricht
+     */
     private String addLog(String message) {
         if (this.log) System.out.println(message);
         return message;
     }
     
+    /**
+     * Fügt einen optionalen Text zum Log hinzu
+     * @param message
+     * @return Hinzugefügte Nachricht
+     */
     private String addOptionalLog(String message) {
         if (this.logVerbose) System.out.println(message);
         return message;
     }
 
+    /**
+     * Fügt einen abschließenden Text zum Log hinzu
+     * Meist die Ergebnisse der Geschwindigkeitsmessungen
+     * @param message
+     * @return Hinzugefügte Nachricht
+     */
     public String addFinalLog(String message) {
         this.finalLogs.add(message);
         return message;
     }
 
+    /**
+     * Gibt das abschließende Log "formatiert" zurück
+     * @return Abschlißenede Nachricht
+     */
     public String getFinalLogMessage() {
         String message = "";
         for (Object line : this.finalLogs) {
@@ -255,26 +310,48 @@ public class WikipediaBenchmark {
         return message.trim();
     }
 
+    /**
+     * Ist momentane Datenbank vom Typ SQL?
+     * @return true wenn ja, false wenn nicht
+     */
     public Boolean isSQL() {
         return (this.type.toLowerCase()=="mysql") ? true : false;
     }
 
+    /**
+     * Ist momentane Datenbank nicht vom Typ SQL?
+     * @return true wenn nicht, false wenn ja
+     */
     public Boolean isNoSQL() {
         return !(this.isSQL());
     }
     
+    /**
+     * Ist als Output CSV gewählt?
+     * @return true wenn ja, false wenn nicht
+     */
     public Boolean outputIsCSV() {
         return (this.outputFormat.toLowerCase().equals("csv"));
     }
-
+    
+    /**
+     * Starte den Zeitmessvorgange
+     */
     public void startTimer() {
         this.startTime=System.currentTimeMillis();
     }
-
+    
+    /**
+     * Starte den Zeitmessvorgang erneut / setze in zurück
+     */
     public void resetTimer() {
         this.startTimer();
     }
 
+    /**
+     * Gibt die gemessene Zeit vom Start bis jetzt zurück
+     * @return 
+     */
     public long measureTimer() {
         this.stopTime=System.currentTimeMillis();
         long difference = this.stopTime-this.startTime;
@@ -282,10 +359,19 @@ public class WikipediaBenchmark {
         return difference;
     }
 
+    /**
+     * Gib die gemessene Zeit als Text zurück
+     * @return gemessene Zeit
+     */
     public String logTimer() {
         return logTimer("");
     }
-
+    
+    /**
+     * Gib die gemessene Zeit als Text mit Prefix zurück
+     * @param message
+     * @return gemessene Zeit+Prefix
+     */
     public String logTimer(String message) {
         double time = this.measureTimer();
         time = Math.round(time);
@@ -295,20 +381,25 @@ public class WikipediaBenchmark {
         return message;
     }
 
+    /**
+     * Logge SQL Befehl
+     * @param sql 
+     */
     public void logSQL(String sql) {
         if (this.logSQL) this.addLog("mysql> "+sql);
     }
 
+    /**
+     * Logge NoSQL Befehl
+     * @param command 
+     */
     public void logNoSQL(String command) {
         if (this.logNoSQL) this.addLog("mongodb> "+command);
     }
-
-    public long countTimer() {
-        long sum = 0;
-        for (int i=0; i<this.timeStack.size();i++) sum = sum+this.timeStack.get(i).longValue();
-        return sum;
-    }
-
+    /**
+     * Öffne MySQL Verbindung
+     * @return MySQL-Verbindung
+     */
     private Connection openConnection() {
         if (this.isSQL()) {
             String dbURL = "jdbc:mysql://"+this.mysqlHost+":"+this.mysqlPort+"/"+this.sqlDatabase;
@@ -325,6 +416,11 @@ public class WikipediaBenchmark {
         return null;
     }
     
+    /**
+     * Konvertiere String zu einem SQL-sicheren String
+     * @param str
+     * @return SQL-sicherer String
+     */
     public static String sqlEscape(String str) {
 		if (str.length() == 0)
 			return ""; //TODO "NULL",too ?
