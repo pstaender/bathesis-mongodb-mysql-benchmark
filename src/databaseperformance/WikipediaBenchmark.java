@@ -114,6 +114,7 @@ public class WikipediaBenchmark {
         String sqlTitle = title;
         if (this.searchInSubtitles) {
             whereCondition = "Content";
+            if (this.useRegularExpressions) title="%"+title+"%";
             sqlTitle = "== "+title+" ==";
         }
         if (this.searchInContent) {
